@@ -1,0 +1,414 @@
+#!/bin/bash
+# Script de Administración para Linux - Proyecto Final Sistemas Operacionales
+# Universidad ICESI
+
+# Colores para mejorar la visualización
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Función para mostrar el menú principal
+show_main_menu() {
+    clear
+    echo -e "${BLUE}=====================================================${NC}"
+    echo -e "${BLUE}         HERRAMIENTA DE ADMINISTRACIÓN LINUX         ${NC}"
+    echo -e "${BLUE}=====================================================${NC}"
+    echo "1. Procesos"
+    echo "2. Usuarios"
+    echo "3. Backup"
+    echo "4. Apagar el equipo"
+    echo "5. Salir"
+    echo -e "${BLUE}=====================================================${NC}"
+    read -p "Seleccione una opción: " option
+    return $option
+}
+
+# Función para el menú de procesos
+show_process_menu() {
+    clear
+    echo -e "${BLUE}=====================================================${NC}"
+    echo -e "${BLUE}                  GESTIÓN DE PROCESOS                ${NC}"
+    echo -e "${BLUE}=====================================================${NC}"
+    echo "1. Listar procesos"
+    echo "2. 5 procesos que más consumen procesador"
+    echo "3. 5 procesos que más consumen memoria"
+    echo "4. Terminar un proceso"
+    echo "5. Volver al menú principal"
+    echo -e "${BLUE}=====================================================${NC}"
+    read -p "Seleccione una opción: " option
+    return $option
+}
+
+# Función para el menú de usuarios
+show_user_menu() {
+    clear
+    echo -e "${BLUE}=====================================================${NC}"
+    echo -e "${BLUE}                  GESTIÓN DE USUARIOS                ${NC}"
+    echo -e "${BLUE}=====================================================${NC}"
+    echo "1. Listar los usuarios del sistema"
+    echo "2. Listado de usuarios según vejez de contraseña"
+    echo "3. Cambiar la contraseña de un usuario"
+    echo "4. Volver al menú principal"
+    echo -e "${BLUE}=====================================================${NC}"
+    read -p "Seleccione una opción: " option
+    return $option
+}
+
+# Función para listar todos los procesos
+list_all_processes() {
+    clear
+    echo -e "${BLUE}=====================================================${NC}"
+    echo -e "${BLUE}                LISTADO DE PROCESOS                  ${NC}"
+    echo -e "${BLUE}=====================================================${NC}"
+    ps aux | less
+    echo -e "${BLUE}=====================================================${NC}"
+    read -p "Presione Enter para continuar"
+}
+
+# Función para mostrar los 5 procesos que más consumen CPU
+list_top_cpu_processes() {
+    clear
+    echo -e "${BLUE}=====================================================${NC}"
+    echo -e "${BLUE}         5 PROCESOS QUE MÁS CONSUMEN CPU             ${NC}"
+    echo -e "${BLUE}=====================================================${NC}"
+    ps aux --sort=-%cpu | head -n 6
+    echo -e "${BLUE}=====================================================${NC}"
+    read -p "Presione Enter para continuar"
+}
+
+# Función para mostrar los 5 procesos que más consumen memoria
+list_top_memory_processes() {
+    clear
+    echo -e "${BLUE}=====================================================${NC}"
+    echo -e "${BLUE}        5 PROCESOS QUE MÁS CONSUMEN MEMORIA          ${NC}"
+    echo -e "${BLUE}=====================================================${NC}"
+    ps aux --sort=-%mem | head -n 6
+    echo -e "${BLUE}=====================================================${NC}"
+    read -p "Presione Enter para continuar"
+}
+
+# Función para terminar un proceso
+kill_selected_process() {
+    clear
+    echo -e "${BLUE}=====================================================${NC}"
+    echo -e "${BLUE}                TERMINAR UN PROCESO                  ${NC}"
+    echo -e "${BLUE}=====================================================${NC}"
+    read -p "Ingrese el ID del proceso a terminar: " process_id
+    
+    if [ -z "$process_id" ]; then
+        echo -e "${RED}ID de proceso no válido${NC}"
+    else
+        if kill -15 $process_id 2>/dev/null; then
+            echo -e "${GREEN}Proceso con ID $process_id terminado correctamente.${NC}"
+        else
+            echo -e "${RED}Error al terminar el proceso. Verifique que el ID existe y que tiene permisos suficientes.${NC}"
+        fi
+    fi
+    
+    echo -e "${BLUE}=====================================================${NC}"
+    read -p "Presione Enter para continuar"
+}
+
+# Función para listar todos los usuarios del sistema
+list_all_users() {
+    clear
+    echo -e "${BLUE}=====================================================${NC}"
+    echo -e "${BLUE}             LISTADO DE USUARIOS DEL SISTEMA         ${NC}"
+    echo -e "${BLUE}=====================================================${NC}"
+    
+    # Mostrar información de usuarios utilizando awk para formatear la salida
+    echo -e "USUARIO\t\tUID\tGID\tHOME\t\t\tSHELL"
+    echo -e "-------\t\t---\t---\t----\t\t\t-----"
+    
+    cat /etc/passwd | grep -v "nologin" | grep -v "false" | sort | \
+    awk -F: '{printf "%-15s %-5s %-5s %-20s %s\n", $1, $3, $4, $6, $7}'
+    
+    echo -e "${BLUE}=====================================================${NC}"
+    read -p "Presione Enter para continuar"
+}
+
+# Función para listar usuarios según vejez de contraseña
+list_users_by_password_age() {
+    clear
+    echo -e "${BLUE}=====================================================${NC}"
+    echo -e "${BLUE}        USUARIOS SEGÚN VEJEZ DE CONTRASEÑA           ${NC}"
+    echo -e "${BLUE}=====================================================${NC}"
+    
+    echo -e "USUARIO\t\tÚLTIMO CAMBIO\t\tDÍAS DESDE CAMBIO"
+    echo -e "-------\t\t-------------\t\t-----------------"
+    
+    # Fecha actual en segundos desde epoch
+    current_date=$(date +%s)
+    
+    # Obtener listado de usuarios regulares (UID >= 1000)
+    for user in $(awk -F: '$3 >= 1000 && $3 != 65534 {print $1}' /etc/passwd); do
+        # Obtener fecha del último cambio de contraseña (días desde epoch)
+        last_change=$(sudo chage -l $user | grep "Last password change" | cut -d: -f2)
+        
+        if [ -n "$last_change" ]; then
+            # Convertir la fecha a segundos desde epoch
+            last_change_date=$(date -d "$last_change" +%s 2>/dev/null)
+            
+            if [ -n "$last_change_date" ]; then
+                # Calcular días transcurridos
+                days_since=$((($current_date - $last_change_date) / 86400))
+                echo -e "$user\t\t$last_change\t$days_since días"
+            else
+                echo -e "$user\t\tNO DISPONIBLE\tN/A"
+            fi
+        else
+            echo -e "$user\t\tNO DISPONIBLE\tN/A"
+        fi
+    done | sort -k3 -n
+    
+    echo -e "${BLUE}=====================================================${NC}"
+    read -p "Presione Enter para continuar"
+}
+
+# Función para cambiar la contraseña de un usuario
+change_user_password() {
+    clear
+    echo -e "${BLUE}=====================================================${NC}"
+    echo -e "${BLUE}            CAMBIAR CONTRASEÑA DE USUARIO            ${NC}"
+    echo -e "${BLUE}=====================================================${NC}"
+    
+    read -p "Ingrese el nombre del usuario: " username
+    
+    if id "$username" &>/dev/null; then
+        echo "Cambiando contraseña para $username..."
+        sudo passwd $username
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}Contraseña cambiada correctamente para el usuario $username.${NC}"
+        else
+            echo -e "${RED}Error al cambiar la contraseña.${NC}"
+        fi
+    else
+        echo -e "${RED}El usuario $username no existe en el sistema.${NC}"
+    fi
+    
+    echo -e "${BLUE}=====================================================${NC}"
+    read -p "Presione Enter para continuar"
+}
+
+# Función para realizar backup del directorio de usuarios
+backup_users_directory() {
+    clear
+    echo -e "${BLUE}=====================================================${NC}"
+    echo -e "${BLUE}             BACKUP DE DIRECTORIO DE USUARIOS        ${NC}"
+    echo -e "${BLUE}=====================================================${NC}"
+    
+    # Directorio de usuarios en Linux
+    source_dir="/home"
+    
+    # Solicitar al usuario el directorio destino para el backup
+    read -p "Ingrese la ruta para guardar el backup (Ej: /mnt/backups): " backup_base_dir
+    
+    # Verificar si existe el directorio, si no, crearlo
+    if [ ! -d "$backup_base_dir" ]; then
+        sudo mkdir -p "$backup_base_dir"
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Error al crear el directorio de backup.${NC}"
+            read -p "Presione Enter para continuar"
+            return
+        fi
+        echo -e "${GREEN}Se ha creado el directorio $backup_base_dir${NC}"
+    fi
+    
+    # Crear nombre del archivo de backup con la fecha actual
+    date=$(date +"%Y-%m-%d_%H-%M-%S")
+    backup_file="users_backup_$date.tar.gz"
+    backup_path="$backup_base_dir/$backup_file"
+    
+    echo "Iniciando backup del directorio de usuarios..."
+    echo "Origen: $source_dir"
+    echo "Destino: $backup_path"
+    
+    # Realizar el backup utilizando tar
+    sudo tar -czf "$backup_path" -C "$(dirname "$source_dir")" "$(basename "$source_dir")"
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Backup completado exitosamente.${NC}"
+        echo -e "${GREEN}Archivo de backup guardado en: $backup_path${NC}"
+    else
+        echo -e "${RED}Error al realizar el backup.${NC}"
+    fi
+    
+    echo -e "${BLUE}=====================================================${NC}"
+    read -p "Presione Enter para continuar"
+}
+
+# Función para programar el backup automático
+schedule_automatic_backup() {
+    clear
+    echo -e "${BLUE}=====================================================${NC}"
+    echo -e "${BLUE}          PROGRAMAR BACKUP AUTOMÁTICO                ${NC}"
+    echo -e "${BLUE}=====================================================${NC}"
+    
+    read -p "Ingrese el directorio donde guardar los backups automáticos: " backup_dir
+    
+    # Verificar si existe el directorio, si no, crearlo
+    if [ ! -d "$backup_dir" ]; then
+        sudo mkdir -p "$backup_dir"
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Error al crear el directorio de backup.${NC}"
+            read -p "Presione Enter para continuar"
+            return
+        fi
+        echo -e "${GREEN}Se ha creado el directorio $backup_dir${NC}"
+    fi
+    
+    # Obtener ruta completa del script actual
+    script_path=$(readlink -f "$0")
+    
+    # Crear un script específico para el backup
+    backup_script="$backup_dir/auto_backup.sh"
+    
+    echo '#!/bin/bash' > "$backup_script"
+    echo "# Script automático de backup generado por la herramienta de administración" >> "$backup_script"
+    echo "date=\$(date +\"%Y-%m-%d_%H-%M-%S\")" >> "$backup_script"
+    echo "backup_file=\"users_backup_\$date.tar.gz\"" >> "$backup_script"
+    echo "backup_path=\"$backup_dir/\$backup_file\"" >> "$backup_script"
+    echo "tar -czf \"\$backup_path\" -C \"/\" \"home\"" >> "$backup_script"
+    echo "echo \"Backup realizado el \$(date) - Archivo: \$backup_file\" >> \"$backup_dir/backup_log.txt\"" >> "$backup_script"
+    
+    # Hacer el script ejecutable
+    chmod +x "$backup_script"
+    
+    # Crear una entrada crontab para ejecutar el backup a las 3:00 AM
+    (crontab -l 2>/dev/null || echo "") | grep -v "$backup_script" > /tmp/crontab.tmp
+    echo "0 3 * * * $backup_script" >> /tmp/crontab.tmp
+    crontab /tmp/crontab.tmp
+    rm /tmp/crontab.tmp
+    
+    echo -e "${GREEN}Backup automático programado correctamente para ejecutarse todos los días a las 3:00 AM.${NC}"
+    echo -e "${GREEN}Script de backup creado en: $backup_script${NC}"
+    
+    echo -e "${BLUE}=====================================================${NC}"
+    read -p "Presione Enter para continuar"
+}
+
+# Función para apagar el equipo
+shutdown_computer() {
+    clear
+    echo -e "${BLUE}=====================================================${NC}"
+    echo -e "${BLUE}                 APAGAR EL EQUIPO                    ${NC}"
+    echo -e "${BLUE}=====================================================${NC}"
+    
+    read -p "¿Está seguro que desea apagar el equipo? (S/N): " confirm
+    
+    if [ "$confirm" = "S" ] || [ "$confirm" = "s" ]; then
+        echo "Apagando el equipo en 10 segundos..."
+        sleep 5
+        sudo shutdown -h now
+    else
+        echo "Operación cancelada."
+        read -p "Presione Enter para continuar"
+    fi
+}
+
+# Verificar si se solicita solo hacer backup (para cron)
+if [ "$1" = "-backup-only" ] && [ -n "$2" ]; then
+    backup_dir="$2"
+    
+    # Directorio de usuarios en Linux
+    source_dir="/home"
+    
+    # Crear nombre del archivo de backup con la fecha actual
+    date=$(date +"%Y-%m-%d_%H-%M-%S")
+    backup_file="users_backup_$date.tar.gz"
+    backup_path="$backup_dir/$backup_file"
+    
+    # Realizar el backup utilizando tar
+    tar -czf "$backup_path" -C "$(dirname "$source_dir")" "$(basename "$source_dir")"
+    
+    # Escribir un log del backup
+    echo "Backup realizado el $(date) - Archivo: $backup_file" >> "$backup_dir/backup_log.txt"
+    
+    exit 0
+fi
+
+# Verificar si el script se ejecuta como root
+check_root() {
+    if [ "$(id -u)" -ne 0 ]; then
+        echo -e "${RED}Este script debe ejecutarse con privilegios de superusuario.${NC}"
+        echo -e "${YELLOW}Por favor, ejecute el script como: sudo $0${NC}"
+        exit 1
+    fi
+}
+
+# Menú principal del script
+main() {
+    # Verificar privilegios de superusuario
+    check_root
+    
+    # Programar el backup automático al iniciar el script
+    schedule_automatic_backup
+    
+    while true; do
+        show_main_menu
+        main_option=$?
+        
+        case $main_option in
+            # Menú de procesos
+            1)
+                while true; do
+                    show_process_menu
+                    process_option=$?
+                    
+                    case $process_option in
+                        1) list_all_processes ;;
+                        2) list_top_cpu_processes ;;
+                        3) list_top_memory_processes ;;
+                        4) kill_selected_process ;;
+                        5) break ;;
+                        *) echo -e "${RED}Opción no válida${NC}"; sleep 1 ;;
+                    esac
+                    
+                    if [ $process_option -eq 5 ]; then
+                        break
+                    fi
+                done
+                ;;
+                
+            # Menú de usuarios
+            2)
+                while true; do
+                    show_user_menu
+                    user_option=$?
+                    
+                    case $user_option in
+                        1) list_all_users ;;
+                        2) list_users_by_password_age ;;
+                        3) change_user_password ;;
+                        4) break ;;
+                        *) echo -e "${RED}Opción no válida${NC}"; sleep 1 ;;
+                    esac
+                    
+                    if [ $user_option -eq 4 ]; then
+                        break
+                    fi
+                done
+                ;;
+                
+            # Backup
+            3) backup_users_directory ;;
+            
+            # Apagar el equipo
+            4) shutdown_computer ;;
+            
+            # Salir del script
+            5) 
+                clear
+                echo "Gracias por usar la herramienta de administración."
+                exit 0
+                ;;
+                
+            *) echo -e "${RED}Opción no válida${NC}"; sleep 1 ;;
+        esac
+    done
+}
+
+# Iniciar el script
+main
